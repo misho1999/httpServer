@@ -4,8 +4,8 @@ using httpServer.Responses;
 
 public class Startup 
 {
-    public static void Main()
-        => new HttpServer(routes => routes
+    public static async Task Main()
+        => await new HttpServer(routes => routes
         .MapGet("/", new TextResponse("Hello from the server!"))
         .MapGet("/Redirect", new RedirectResponse("/HTML"))
         .MapGet("/HTML", new HtmlResponse(Startup.HtmlForm))
