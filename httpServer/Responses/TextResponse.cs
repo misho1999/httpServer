@@ -7,7 +7,7 @@ namespace httpServer.Responses
 {
     public class TextResponse : ContentResponse
     {
-        public TextResponse(string text) : base(text, ContentType.Plain)
+        public TextResponse(string text, Action<Request, Response> preRenderAction = null) : base(text, ContentType.Plain, preRenderAction)
         {
         }
     }

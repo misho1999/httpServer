@@ -1,8 +1,5 @@
 ﻿using httpServer.Common;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Text;
 
 namespace httpServer.HTTP
 {
@@ -10,13 +7,18 @@ namespace httpServer.HTTP
     {
         private readonly Dictionary<string, Header> headers = new Dictionary<string, Header>();
 
+        public string this[string name] => this.headers[name].Value;
+
         public int Count => headers.Count;
+
+        public bool Contains(string name)
+            => headers.ContainsKey(name);
 
         public void Add(string name, string value)
         {
             Guard.AgainstNull(name, nameof(name));
             Guard.AgainstNull(value, nameof(value));
-            headers.Add(name, new Header(name, value));
+            this.headers[name] = new Header(name, value);
         }
 
         public IEnumerator<Header> GetEnumerator()

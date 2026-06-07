@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Web;
 
 namespace httpServer.HTTP
 {
@@ -14,25 +12,67 @@ namespace httpServer.HTTP
 
         public string Body { get; private set; }
 
+        public IReadOnlyDictionary<string, string> Form { get; private set; }
+
         public static Request Parse(string request)
         {
+            if (string.IsNullOrWhiteSpace(request))
+            {
+                throw new InvalidOperationException("Request is empty.");
+            }
+
             var lines = request.Split("\r\n");
-            var firstLine = lines
-                .First()
-                .Split(" ");
+            if (lines.Length == 0)
+            {
+                throw new InvalidOperationException("Request is empty.");
+            }
+
+            var firstLineRaw = lines.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(firstLineRaw))
+            {
+                throw new InvalidOperationException("Invalid request line.");
+            }
+
+            var firstLine = firstLineRaw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (firstLine.Length < 2)
+            {
+                throw new InvalidOperationException($"Invalid request line: {firstLineRaw}");
+            }
 
             var url = firstLine[1];
             Method method = ParseMethod(firstLine[0]);
             HeaderCollection headers = ParseHeaders(lines.Skip(1));
             var bodyLines = lines.Skip(headers.Count + 2);
             string body = string.Join("\r\n", bodyLines);
+            var form = ParseForm(headers, body);
             return new Request
             {
                 Method = method,
                 Url = url,
                 Headers = headers,
-                Body = body
+                Body = body,
+                Form = form
+
             };
+        }
+
+        private static IReadOnlyDictionary<string, string> ParseForm(HeaderCollection headers, string body)
+        {
+            var formCollection = new Dictionary<string, string>();
+            if (headers.Contains(Header.ContentType))
+            {
+                var contentTypeHeader = headers[Header.ContentType] ?? string.Empty;
+                // Compare media type only, ignore optional charset or parameters
+                if (contentTypeHeader.Split(';', 2)[0].Trim().Equals("application/x-www-form-urlencoded", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    var parsedResult = ParseFormData(body);
+                    foreach (var (name, value) in parsedResult)
+                    {
+                        formCollection.Add(name, value);
+                    }
+                }
+            }
+            return formCollection;
         }
 
         private static HeaderCollection ParseHeaders(IEnumerable<string> lines)
@@ -67,5 +107,17 @@ namespace httpServer.HTTP
 
             throw new InvalidOperationException($"Method {method} is not supported.");
         }
+
+        private static Dictionary<string, string> ParseFormData(string bodyLines)
+            => HttpUtility.UrlDecode(bodyLines)
+            .Split('&')
+            .Select(part => part.Split('='))
+            .Where(part => part.Length == 2)
+            .ToDictionary(
+                part => part[0],
+                part => part[1],
+                StringComparer.InvariantCultureIgnoreCase);
+
+
     }
 }

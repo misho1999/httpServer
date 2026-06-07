@@ -49,11 +49,15 @@ namespace httpServer
                 var networkStream = connection.GetStream();
 
                 string requestText = this.ReadRequest(networkStream);
-                Console.WriteLine(requestText);
 
                 var request = Request.Parse(requestText);
 
-                var response = this.routingTable.MatchRequest(request);
+                Response response = (Response)this.routingTable.MatchRequest(request);
+
+                if (response.PreRenderAction != null)
+                {
+                    response.PreRenderAction(request, response);
+                }
 
                 WriteResponse(networkStream, (Response)response);
                 connection.Close();
@@ -63,33 +67,10 @@ namespace httpServer
 
         private void WriteResponse(NetworkStream networkStream, Response response)
         {
-            byte[] body = Encoding.UTF8.GetBytes(response.Body ?? string.Empty);
-            int contentLength = body.Length;
-
-            var sb = new StringBuilder();
-            sb.AppendLine($"HTTP/1.1 {(int)response.StatusCode} {response.StatusCode}");
-
-            bool hasContentLength = false;
-            foreach (var header in response.Headers)
-            {
-                if (string.Equals(header.Name, Header.ContentLength, StringComparison.OrdinalIgnoreCase))
-                {
-                    hasContentLength = true;
-                }
-
-                sb.AppendLine(header.ToString());
-            }
-
-            if (!hasContentLength)
-            {
-                sb.AppendLine($"{Header.ContentLength}: {contentLength}");
-            }
-
-            sb.AppendLine(); // blank line separates headers from body
-
-            byte[] headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
-            networkStream.Write(headerBytes, 0, headerBytes.Length);
-            networkStream.Write(body, 0, body.Length);
+            // Use the response's ToString implementation to render headers and body
+            var responseText = response.ToString();
+            var responseBytes = Encoding.UTF8.GetBytes(responseText);
+            networkStream.Write(responseBytes, 0, responseBytes.Length);
             networkStream.Flush();
         }
 

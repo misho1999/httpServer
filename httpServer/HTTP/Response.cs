@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Intrinsics.X86;
-using System.Text;
+﻿using System.Text;
 
 namespace httpServer.HTTP
 {
@@ -20,10 +17,18 @@ namespace httpServer.HTTP
         public HeaderCollection Headers { get; } = new HeaderCollection();
 
         // Initialize to an empty string so the non-nullable property is always set
-        public string Body { get; init; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+
+        public Action<Request, Response> PreRenderAction { get; protected set; }
         public override string ToString()
         {
             var result = new StringBuilder();
+            // Ensure Content-Length header is present and correct (measured in UTF-8 bytes)
+            var bodyBytes = Encoding.UTF8.GetBytes(this.Body ?? string.Empty);
+            if (!this.Headers.Contains(Header.ContentLength))
+            {
+                this.Headers.Add(Header.ContentLength, bodyBytes.Length.ToString());
+            }
 
             result.AppendLine($"HTTP/1.1 {(int)StatusCode} {StatusCode}");
             foreach(var header in this.Headers)
