@@ -2,9 +2,10 @@
 {
     public enum Method
     {
-        GET,
-        POST,
-        PUT,
-        DELETE
+
+        Get,
+        Post,
+        Put,
+        Delete
     }
 }

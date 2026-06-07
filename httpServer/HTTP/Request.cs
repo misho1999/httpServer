@@ -38,18 +38,21 @@ namespace httpServer.HTTP
         private static HeaderCollection ParseHeaders(IEnumerable<string> lines)
         {
             var headers = new HeaderCollection();
-            
+
             foreach (var line in lines)
             {
                 if (string.IsNullOrEmpty(line))
                     break;
 
-                var parts = line.Split(":");
-                if (parts.Length != 2)
+                int idx = line.IndexOf(':');
+                if (idx <= 0)
                 {
                     throw new InvalidOperationException($"Invalid header line: {line}");
                 }
-                headers.Add(parts[0].Trim(), parts[1].Trim());
+
+                var name = line.Substring(0, idx).Trim();
+                var value = line.Substring(idx + 1).Trim();
+                headers.Add(name, value);
             }
 
             return headers;
@@ -57,15 +60,12 @@ namespace httpServer.HTTP
 
         private static Method ParseMethod(string method)
         {
-            try
+            if (Enum.TryParse<Method>(method, true, out var parsed))
             {
-                return Enum.Parse<Method>(method);
+                return parsed;
             }
-            catch (Exception)
-            {
 
-                throw new InvalidOperationException($"Method {method} is not supported.");
-            }
+            throw new InvalidOperationException($"Method {method} is not supported.");
         }
     }
 }

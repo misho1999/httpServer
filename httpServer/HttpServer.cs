@@ -1,4 +1,6 @@
-﻿using System;
+﻿using httpServer.HTTP;
+using httpServer.Routing;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,11 +16,24 @@ namespace httpServer
         private readonly int port;
         private readonly TcpListener serverListener;
 
-        public HttpServer(string _ipAddress, int _port)
+        private readonly RoutingTable routingTable;
+
+        public HttpServer(string ipAddress, int port, Action<IRoutingTable> routingTableConfiguration)
         {
-            ipAddress = IPAddress.Parse(_ipAddress);
-            port = _port;
-            serverListener = new TcpListener(ipAddress, port);
+            this.ipAddress = IPAddress.Parse(ipAddress);
+            this.port = port;
+            this.serverListener = new TcpListener(this.ipAddress, this.port);
+           
+            routingTableConfiguration(this.routingTable = new RoutingTable());   
+        }
+
+        public HttpServer(int port, Action<IRoutingTable> routingTable) : this("127.0.0.1", port, routingTable)
+        {
+
+        }
+
+        public HttpServer(Action<IRoutingTable> routingTable) : this(55000, routingTable)
+        {
         }
 
         public void Start() {
@@ -30,28 +45,49 @@ namespace httpServer
             while (true)
             {
                 var connection = serverListener.AcceptTcpClient();
+
                 var networkStream = connection.GetStream();
-                string request = ReadRequest(networkStream);
-                Console.WriteLine( request);
-                WriteResponse(networkStream, "Hello, World!");
+
+                string requestText = this.ReadRequest(networkStream);
+                Console.WriteLine(requestText);
+
+                var request = Request.Parse(requestText);
+
+                var response = this.routingTable.MatchRequest(request);
+
+                WriteResponse(networkStream, (Response)response);
                 connection.Close();
             }
 
         }
 
-        private void WriteResponse(NetworkStream networkStream, string content)
+        private void WriteResponse(NetworkStream networkStream, Response response)
         {
-            byte[] body = Encoding.UTF8.GetBytes(content);
+            byte[] body = Encoding.UTF8.GetBytes(response.Body ?? string.Empty);
             int contentLength = body.Length;
 
-            string headers =
-                $"HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/plain; charset=utf-8\r\n" +
-                $"Content-Length: {contentLength}\r\n" +
-                "Connection: close\r\n" +
-                "\r\n"; // blank line separates headers from body
+            var sb = new StringBuilder();
+            sb.AppendLine($"HTTP/1.1 {(int)response.StatusCode} {response.StatusCode}");
 
-            byte[] headerBytes = Encoding.UTF8.GetBytes(headers);
+            bool hasContentLength = false;
+            foreach (var header in response.Headers)
+            {
+                if (string.Equals(header.Name, Header.ContentLength, StringComparison.OrdinalIgnoreCase))
+                {
+                    hasContentLength = true;
+                }
+
+                sb.AppendLine(header.ToString());
+            }
+
+            if (!hasContentLength)
+            {
+                sb.AppendLine($"{Header.ContentLength}: {contentLength}");
+            }
+
+            sb.AppendLine(); // blank line separates headers from body
+
+            byte[] headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
             networkStream.Write(headerBytes, 0, headerBytes.Length);
             networkStream.Write(body, 0, body.Length);
             networkStream.Flush();
