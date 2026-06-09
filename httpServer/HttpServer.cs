@@ -61,8 +61,13 @@ namespace httpServer
                  {
                      response.PreRenderAction(request, response);
                  }
-
-                 await this.WriteResponse(networkStream, (Response)response);
+                // Echo client's cookies into a response header so it's visible in DevTools under Response Headers
+                if (request?.Cookies != null && request.Cookies.Any())
+                {
+                    var cookieHeader = string.Join("; ", request.Cookies.Select(c => $"{c.Name}={c.Value}"));
+                    response.Headers.Add("X-Request-Cookies", cookieHeader);
+                }
+                await this.WriteResponse(networkStream, request, (Response)response);
 
                  connection.Close();
              });
@@ -70,13 +75,18 @@ namespace httpServer
 
         }
 
-        private async Task WriteResponse(NetworkStream networkStream, Response response)
+        private Task WriteResponse(NetworkStream networkStream, Response response)
+        {
+            return this.WriteResponse(networkStream, null, response);
+        }
+
+        private async Task WriteResponse(NetworkStream networkStream, Request request, Response response)
         {
             // Use the response's ToString implementation to render headers and body
             var responseText = response.ToString();
             var responseBytes = Encoding.UTF8.GetBytes(responseText);
             await networkStream.WriteAsync(responseBytes, 0, responseBytes.Length);
-            networkStream.Flush();
+            await networkStream.FlushAsync();
         }
 
         private async Task<string> ReadRequest(NetworkStream networkStream)

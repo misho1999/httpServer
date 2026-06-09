@@ -16,6 +16,8 @@ namespace httpServer.HTTP
 
         public HeaderCollection Headers { get; } = new HeaderCollection();
 
+        public CookieCollection Cookies { get; } = new CookieCollection();
+
         // Initialize to an empty string so the non-nullable property is always set
         public string Body { get; set; } = string.Empty;
 
@@ -31,15 +33,25 @@ namespace httpServer.HTTP
             }
 
             result.AppendLine($"HTTP/1.1 {(int)StatusCode} {StatusCode}");
+
             foreach(var header in this.Headers)
             {
                 result.AppendLine(header.ToString());
             }
+
+            foreach (var cookie in this.Cookies)
+            {
+                result.AppendLine($"{Header.SetCookie}: {cookie}");
+            }
+
             result.AppendLine(); // blank line separates headers from body
+
             if (!string.IsNullOrEmpty(this.Body))
+
             {
                 result.AppendLine(this.Body);
             }
+
             return result.ToString();
         }
 

@@ -10,6 +10,8 @@ namespace httpServer.HTTP
 
         public HeaderCollection Headers { get; private set; }
 
+        public CookieCollection Cookies { get; private set; }
+
         public string Body { get; private set; }
 
         public IReadOnlyDictionary<string, string> Form { get; private set; }
@@ -42,6 +44,7 @@ namespace httpServer.HTTP
             var url = firstLine[1];
             Method method = ParseMethod(firstLine[0]);
             HeaderCollection headers = ParseHeaders(lines.Skip(1));
+            var cookies = ParseCookies(headers);
             var bodyLines = lines.Skip(headers.Count + 2);
             string body = string.Join("\r\n", bodyLines);
             var form = ParseForm(headers, body);
@@ -50,10 +53,31 @@ namespace httpServer.HTTP
                 Method = method,
                 Url = url,
                 Headers = headers,
+                Cookies = cookies,
                 Body = body,
                 Form = form
 
             };
+        }
+
+        private static CookieCollection ParseCookies(HeaderCollection headers)
+        {
+            var cookieCollection = new CookieCollection();
+            if (headers.Contains(Header.Cookie))
+            {
+                var cookieHeader = headers[Header.Cookie];
+                var allCookies = cookieHeader.Split(';');
+                    
+                foreach (var cookieText in allCookies)
+                {
+                    var cookieParts = cookieText.Split('=');
+                   var cookieName = cookieParts[0].Trim();
+                    var cookieValue = cookieParts[1].Trim();
+
+                    cookieCollection.Add(cookieName, cookieValue);
+                }
+            }
+            return cookieCollection;
         }
 
         private static IReadOnlyDictionary<string, string> ParseForm(HeaderCollection headers, string body)
