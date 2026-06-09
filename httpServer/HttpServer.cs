@@ -61,13 +61,10 @@ namespace httpServer
                  {
                      response.PreRenderAction(request, response);
                  }
-                // Echo client's cookies into a response header so it's visible in DevTools under Response Headers
-                if (request?.Cookies != null && request.Cookies.Any())
-                {
-                    var cookieHeader = string.Join("; ", request.Cookies.Select(c => $"{c.Name}={c.Value}"));
-                    response.Headers.Add("X-Request-Cookies", cookieHeader);
-                }
-                await this.WriteResponse(networkStream, request, (Response)response);
+
+                 AddSession(request, response);
+
+                 await this.WriteResponse(networkStream, (Response)response);
 
                  connection.Close();
              });
@@ -75,18 +72,28 @@ namespace httpServer
 
         }
 
-        private Task WriteResponse(NetworkStream networkStream, Response response)
+        private void AddSession(Request request, Response response)
         {
-            return this.WriteResponse(networkStream, null, response);
+            var sessionExists = request.Session.ContainsKey(Session.SessionCurrentDateKey);
+
+            if (!sessionExists)
+            {
+              request.Session[Session.SessionCurrentDateKey]
+                    = DateTime.UtcNow.ToString();
+
+              response.Cookies
+                    .Add(Session.SessionCookieName, request.Session.Id);
+            }
         }
 
-        private async Task WriteResponse(NetworkStream networkStream, Request request, Response response)
+
+        private async Task WriteResponse(NetworkStream networkStream, Response response)
         {
             // Use the response's ToString implementation to render headers and body
             var responseText = response.ToString();
             var responseBytes = Encoding.UTF8.GetBytes(responseText);
             await networkStream.WriteAsync(responseBytes, 0, responseBytes.Length);
-            await networkStream.FlushAsync();
+            networkStream.Flush();
         }
 
         private async Task<string> ReadRequest(NetworkStream networkStream)
